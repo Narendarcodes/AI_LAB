@@ -1,131 +1,114 @@
-import java.util.*;
+#include <iostream>
+#include <vector>
+#include <map>
+#include <functional>
+#include <string>
+
+using namespace std;
 
 class ConstraintSatisfactionProblem {
+private:
+    vector<string> variables;
+    map<string, vector<int>> domains;
+    map<string, vector<function<bool(string, int, map<string, int>&)>>> constraints;
 
-    private List<String> variables;
-    private Map<String, List<Integer>> domains;
-    private Map<String, List<Constraint>> constraints;
-
-    // Functional interface for constraints
-    interface Constraint {
-        boolean isSatisfied(String variable, int value, Map<String, Integer> assignment);
+public:
+    ConstraintSatisfactionProblem(
+        vector<string> vars,
+        map<string, vector<int>> doms,
+        map<string, vector<function<bool(string, int, map<string, int>&)>>> cons)
+    {
+        variables = vars;
+        domains = doms;
+        constraints = cons;
     }
 
-    public ConstraintSatisfactionProblem(
-            List<String> variables,
-            Map<String, List<Integer>> domains,
-            Map<String, List<Constraint>> constraints) {
-
-        this.variables = variables;
-        this.domains = domains;
-        this.constraints = constraints;
-    }
-
-    // Check if assignment is consistent
-    private boolean isConsistent(String variable, int value, Map<String, Integer> assignment) {
-        if (!constraints.containsKey(variable)) return true;
-
-        for (Constraint constraint : constraints.get(variable)) {
-            if (!constraint.isSatisfied(variable, value, assignment)) {
+    bool is_consistent(string variable, int value, map<string, int>& assignment) {
+        for (auto& constraint : constraints[variable]) {
+            if (!constraint(variable, value, assignment))
                 return false;
-            }
         }
         return true;
     }
 
-    // Backtracking algorithm
-    public Map<String, Integer> backtrack(Map<String, Integer> assignment) {
-
-        // If assignment complete, return solution
+    map<string, int>* backtrack(map<string, int>& assignment) {
         if (assignment.size() == variables.size()) {
-            return new HashMap<>(assignment);
+            return new map<string, int>(assignment);
         }
 
-        // Select unassigned variable
-        String var = selectUnassignedVariable(assignment);
+        string var = select_unassigned_variable(assignment);
 
-        // Try all domain values
-        for (int value : orderDomainValues(var)) {
+        for (int value : order_domain_values(var, assignment)) {
+            if (is_consistent(var, value, assignment)) {
+                assignment[var] = value;
 
-            if (isConsistent(var, value, assignment)) {
-                assignment.put(var, value);
-
-                Map<String, Integer> result = backtrack(assignment);
-
-                if (result != null) {
+                map<string, int>* result = backtrack(assignment);
+                if (result != nullptr)
                     return result;
-                }
 
-                // Backtrack
-                assignment.remove(var);
+                assignment.erase(var); // Backtrack
             }
         }
-
-        return null; // Failure
+        return nullptr;
     }
 
-    private String selectUnassignedVariable(Map<String, Integer> assignment) {
-        for (String variable : variables) {
-            if (!assignment.containsKey(variable)) {
+    string select_unassigned_variable(map<string, int>& assignment) {
+        for (auto& variable : variables) {
+            if (assignment.find(variable) == assignment.end())
                 return variable;
-            }
         }
-        return null;
+        return "";
     }
 
-    private List<Integer> orderDomainValues(String variable) {
-        return domains.get(variable);
+    vector<int> order_domain_values(string variable, map<string, int>& assignment) {
+        return domains[variable];
     }
-}
+};
 
-public class Main {
+int main() {
+    // Variables
+    vector<string> variables = {"A", "B", "C"};
 
-    public static void main(String[] args) {
+    // Domains
+    map<string, vector<int>> domains = {
+        {"A", {1, 2, 3}},
+        {"B", {1, 2, 3}},
+        {"C", {1, 2, 3}}
+    };
 
-        // Variables
-        List<String> variables = Arrays.asList("A", "B", "C");
+    // Constraints
+    map<string, vector<function<bool(string, int, map<string, int>&)>>> constraints;
 
-        // Domains
-        Map<String, List<Integer>> domains = new HashMap<>();
-        domains.put("A", Arrays.asList(1, 2, 3));
-        domains.put("B", Arrays.asList(1, 2, 3));
-        domains.put("C", Arrays.asList(1, 2, 3));
+    constraints["A"].push_back([](string var, int val, map<string, int>& ass) {
+        return ass.find("B") == ass.end() || ass["B"] != val;
+    });
 
-        // Constraints
-        Map<String, List<ConstraintSatisfactionProblem.Constraint>> constraints = new HashMap<>();
+    constraints["B"].push_back([](string var, int val, map<string, int>& ass) {
+        return ass.find("A") == ass.end() || ass["A"] != val;
+    });
 
-        // A != B
-        constraints.put("A", new ArrayList<>());
-        constraints.get("A").add((var, val, ass) ->
-                !ass.containsKey("B") || ass.get("B") != val
-        );
+    constraints["C"].push_back([](string var, int val, map<string, int>& ass) {
+        return ass.find("A") == ass.end() || ass["A"] != val;
+    });
 
-        constraints.put("B", new ArrayList<>());
-        constraints.get("B").add((var, val, ass) ->
-                !ass.containsKey("A") || ass.get("A") != val
-        );
+    constraints["C"].push_back([](string var, int val, map<string, int>& ass) {
+        return ass.find("B") == ass.end() || ass["B"] != val;
+    });
 
-        constraints.put("C", new ArrayList<>());
-        constraints.get("C").add((var, val, ass) ->
-                !ass.containsKey("A") || ass.get("A") != val
-        );
-        constraints.get("C").add((var, val, ass) ->
-                !ass.containsKey("B") || ass.get("B") != val
-        );
+    ConstraintSatisfactionProblem csp(variables, domains, constraints);
 
-        // Create CSP object
-        ConstraintSatisfactionProblem csp =
-                new ConstraintSatisfactionProblem(variables, domains, constraints);
+    map<string, int> assignment;
+    map<string, int>* solution = csp.backtrack(assignment);
 
-        Map<String, Integer> solution = csp.backtrack(new HashMap<>());
-
-        if (solution != null) {
-            System.out.println("Solution found:");
-            for (Map.Entry<String, Integer> entry : solution.entrySet()) {
-                System.out.println(entry.getKey() + ": " + entry.getValue());
-            }
-        } else {
-            System.out.println("No solution found.");
+    if (solution != nullptr) {
+        cout << "Solution found:\n";
+        for (auto& pair : *solution) {
+            cout << pair.first << ": " << pair.second << endl;
         }
+        delete solution;
+    } else {
+        cout << "No solution found.\n";
     }
+
+    return 0;
 }
